@@ -37,7 +37,7 @@ class Zotero2Readwise:
 
         print(f"✅ Retrieved {len(items)} Zotero items")
 
-        # Enrich each annotation/note with its parent item’s metadata
+        # Enrich each entry with its parent item's data
         enriched = []
         for itm in items:
             data = itm.get("data", {})
@@ -45,7 +45,7 @@ class Zotero2Readwise:
             parent_data = {}
             if parent_key:
                 try:
-                    parent = self.zotero.item(itemKey=parent_key)
+                    parent = self.zotero.item(parent_key)
                     parent_data = parent.get("data", {})
                 except Exception:
                     parent_data = {}
