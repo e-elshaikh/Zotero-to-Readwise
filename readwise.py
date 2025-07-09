@@ -14,29 +14,40 @@ class Readwise:
         self.lib_id = library_id
         self.lib_type = library_type
 
-    def format_items(self, zotero_items):
+    def format_items(self, enriched_items):
+        """
+        enriched_items: list of tuples (annotation_data, parent_data)
+        """
         formatted = []
-        for item in zotero_items:
-            data = item.get("data", {})
+        for data, parent in enriched_items:
+            # 1) Extract text
+            text = data.get("annotationText") or data.get("note") or ""
+            # 2) Extract title from parent
+            title = parent.get("title") or ""
+            # 3) Build author string from parent creators
+            creators = parent.get("creators", [])
+            if creators:
+                author = ", ".join(
+                    f"{c.get('firstName','')} {c.get('lastName','')}".strip()
+                    for c in creators
+                    if c.get("firstName") or c.get("lastName")
+                )
+            else:
+                author = ""
 
-            # Extract fields
-            text   = data.get("annotationText") or data.get("note") or ""
-            title  = data.get("title") or ""
-            author = data.get("creatorSummary") or ""
-
-            # Skip if any required field is blank
+            # Skip if any of the three is blank
             if not (text.strip() and title.strip() and author.strip()):
                 continue
 
-            # Truncate overly long text
+            # Truncate text if too long
             text = text[:MAX_TEXT_LEN]
 
-            # Build a valid Zotero URL for this item
-            key = data.get("key")
+            # Construct Zotero URL
+            parent_key = data.get("parentItem")
             if self.lib_type == "user":
-                source_url = f"https://www.zotero.org/users/{self.lib_id}/items/{key}"
+                source_url = f"https://www.zotero.org/users/{self.lib_id}/items/{parent_key}"
             else:
-                source_url = f"https://www.zotero.org/groups/{self.lib_id}/items/{key}"
+                source_url = f"https://www.zotero.org/groups/{self.lib_id}/items/{parent_key}"
 
             formatted.append({
                 "text":       text,
@@ -55,16 +66,10 @@ class Readwise:
 
         for idx, hl in enumerate(highlights, start=1):
             try:
-                resp = requests.post(
-                    API_URL,
-                    headers=headers,
-                    json={"highlights": [hl]},
-                    timeout=30
-                )
+                resp = requests.post(API_URL, headers=headers, json={"highlights": [hl]}, timeout=30)
                 resp.raise_for_status()
                 print(f"✅ Uploaded {idx}/{len(highlights)}")
             except RequestException as e:
-                # Try to parse JSON error, else show exception text
                 try:
                     err = resp.json()
                 except Exception:
@@ -73,7 +78,7 @@ class Readwise:
                 self.failed.append({"item": hl, "error": err})
                 if not self.suppress:
                     raise
-            time.sleep(1)  # throttle to avoid rate limits
+            time.sleep(1)  # throttle
 
         if self.failed:
             with open("failed_readwise.json", "w", encoding="utf-8") as f:
