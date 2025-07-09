@@ -1,0 +1,8 @@
+[project]
+name = "zotero2readwise"
+version = "0.1.0"
+description = "Sync Zotero annotations to Readwise"
+dependencies = [
+    "requests",
+    "pyzotero"
+]
