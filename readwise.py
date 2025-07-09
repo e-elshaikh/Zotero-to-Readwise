@@ -20,29 +20,21 @@ class Readwise:
         """
         formatted = []
         for data, parent in enriched_items:
-            # 1) Extract text
+            # 1) Annotation text or note
             text = data.get("annotationText") or data.get("note") or ""
-            # 2) Extract title from parent
+            # 2) Title from parent metadata
             title = parent.get("title") or ""
-            # 3) Build author string from parent creators
-            creators = parent.get("creators", [])
-            if creators:
-                author = ", ".join(
-                    f"{c.get('firstName','')} {c.get('lastName','')}".strip()
-                    for c in creators
-                    if c.get("firstName") or c.get("lastName")
-                )
-            else:
-                author = ""
+            # 3) Author summary from Zotero
+            author = parent.get("creatorSummary") or ""
 
             # Skip if any of the three is blank
             if not (text.strip() and title.strip() and author.strip()):
                 continue
 
-            # Truncate text if too long
+            # Truncate text if needed
             text = text[:MAX_TEXT_LEN]
 
-            # Construct Zotero URL
+            # Build Zotero URL for this highlight’s parent item
             parent_key = data.get("parentItem")
             if self.lib_type == "user":
                 source_url = f"https://www.zotero.org/users/{self.lib_id}/items/{parent_key}"
@@ -78,7 +70,7 @@ class Readwise:
                 self.failed.append({"item": hl, "error": err})
                 if not self.suppress:
                     raise
-            time.sleep(1)  # throttle
+            time.sleep(1)  # throttle between requests
 
         if self.failed:
             with open("failed_readwise.json", "w", encoding="utf-8") as f:
