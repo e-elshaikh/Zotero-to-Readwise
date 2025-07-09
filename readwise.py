@@ -1,6 +1,5 @@
 import requests
 import json
-from datetime import datetime
 
 class Readwise:
     def __init__(self, readwise_token, suppress_failures=False):
@@ -9,30 +8,25 @@ class Readwise:
         self.failed_items = []
         self.suppress_failures = suppress_failures
 
-    def format_zotero_items(self, zotero_items):
+    def format_zotero_items(self, items, include_annotations=True, include_notes=False):
         formatted = []
-
-        for item in zotero_items:
-            try:
-                highlight = {
-                    "text": item.get("text", ""),
-                    "title": item.get("title", "Zotero Highlight"),
-                    "source_type": "book",
+        for item in items:
+            if item["type"] == "annotation" and include_annotations:
+                formatted.append({
+                    "text": item.get("annotation", ""),
+                    "title": item.get("title", ""),
+                    "author": item.get("author", ""),
                     "source_url": item.get("source_url", ""),
                     "location": item.get("location", ""),
-                    "highlighted_at": item.get("highlighted_at", datetime.utcnow().isoformat()),
-                    "note": item.get("note", ""),
-                    "tags": item.get("tags", [])
-                }
-                formatted.append(highlight)
-            except Exception as e:
-                self.failed_items.append({
-                    "error": str(e),
-                    "item": item
                 })
-                if not self.suppress_failures:
-                    raise
-
+            elif item["type"] == "note" and include_notes:
+                formatted.append({
+                    "text": item.get("note", ""),
+                    "title": item.get("title", ""),
+                    "author": item.get("author", ""),
+                    "source_url": item.get("source_url", ""),
+                    "location": item.get("location", ""),
+                })
         return formatted
 
     def create_highlights(self, highlights):
@@ -40,22 +34,14 @@ class Readwise:
             "Authorization": f"Token {self.token}",
             "Content-Type": "application/json"
         }
-
-        batch_size = 100
-        for i in range(0, len(highlights), batch_size):
-            batch = highlights[i:i + batch_size]
+        for highlight in highlights:
             try:
-                resp = requests.post(
-                    self.api_url,
-                    headers=headers,
-                    data=json.dumps({"highlights": batch})
-                )
-                if resp.status_code != 200:
-                    self.failed_items.extend(batch)
-            except Exception as e:
-                self.failed_items.extend(batch)
+                resp = requests.post(self.api_url, headers=headers, data=json.dumps({"highlights": [highlight]}))
+                resp.raise_for_status()
+            except requests.exceptions.RequestException as e:
                 if not self.suppress_failures:
                     raise
+                self.failed_items.append(highlight)
 
     def save_failed_items_to_json(self, path):
         if self.failed_items:
