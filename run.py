@@ -1,6 +1,9 @@
 import argparse
 from zt2rw import Zotero2Readwise
 
+def str2bool(v):
+    return v.lower() in ("true", "1", "yes")
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("readwise_token", help="Your Readwise API token")
@@ -14,15 +17,15 @@ def main():
     )
     parser.add_argument(
         "--include_annotations",
-        action="store_true",
+        type=str2bool,
         default=True,
-        help="Include annotations"
+        help="Include annotations? True or False"
     )
     parser.add_argument(
         "--include_notes",
-        action="store_true",
+        type=str2bool,
         default=False,
-        help="Include notes"
+        help="Include notes? True or False"
     )
     parser.add_argument(
         "--suppress_failures",
