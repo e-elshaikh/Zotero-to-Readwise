@@ -1,13 +1,16 @@
-name: Sync Zotero to Readwise
+name: Zotero to Readwise Automation
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 12 * * *'  # Runs every day at 12:00 UTC
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -20,6 +23,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run sync
+      - name: Run Zotero to Readwise sync
         run: |
-          python run.py ${{ secrets.READWISE_TOKEN }} ${{ secrets.ZOTERO_KEY }} ${{ secrets.ZOTERO_ID }} --library_type ${{ secrets.ZOTERO_LIBRARY_TYPE }} --include_annotations True --include_notes False
+          python run.py ${{ secrets.READWISE_API_KEY }} ${{ secrets.ZOTERO_API_KEY }} ${{ secrets.ZOTERO_LIBRARY_ID }} --library_type ${{ secrets.ZOTERO_LIBRARY_TYPE }} --include_annotations True --include_notes False
