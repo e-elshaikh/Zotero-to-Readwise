@@ -12,38 +12,57 @@ class Zotero2Readwise:
         include_notes=False,
         suppress_failures=False
     ):
-        self.readwise = Readwise(readwise_token, suppress_failures)
         self.zotero = zotero.Zotero(
-            zotero_library_id,
-            zotero_library_type,
-            zotero_key
+            library_id=zotero_library_id,
+            library_type=zotero_library_type,
+            api_key=zotero_key
+        )
+        self.readwise = Readwise(
+            token=readwise_token,
+            suppress_failures=suppress_failures,
+            library_id=zotero_library_id,
+            library_type=zotero_library_type
         )
         self.include_annotations = include_annotations
         self.include_notes = include_notes
 
     def run(self):
-        print("🔎 Retrieving annotations...")
-        annotations = self._retrieve_all("annotation") if self.include_annotations else []
-        print("🔎 Retrieving notes...")
-        notes = self._retrieve_all("note") if self.include_notes else []
-        all_items = annotations + notes
-        print(f"✅ Retrieved {len(all_items)} Zotero items")
+        items = []
+        if self.include_annotations:
+            print("🔎 Retrieving annotations...")
+            items.extend(self._retrieve_all("annotation"))
+        if self.include_notes:
+            print("🔎 Retrieving notes...")
+            items.extend(self._retrieve_all("note"))
 
-        formatted = self.readwise.format_items(all_items)
+        print(f"✅ Retrieved {len(items)} Zotero items")
+
+        # Enrich each annotation/note with its parent item’s metadata
+        enriched = []
+        for itm in items:
+            data = itm.get("data", {})
+            parent_key = data.get("parentItem")
+            parent_data = {}
+            if parent_key:
+                try:
+                    parent = self.zotero.item(itemKey=parent_key)
+                    parent_data = parent.get("data", {})
+                except Exception:
+                    parent_data = {}
+            enriched.append((data, parent_data))
+
+        formatted = self.readwise.format_items(enriched)
+        print(f"→ {len(formatted)} items to upload")
         self.readwise.send_items(formatted)
 
     def _retrieve_all(self, item_type):
-        items = []
+        all_items = []
         start = 0
         limit = 100
         while True:
-            batch = self.zotero.items(
-                itemType=item_type,
-                start=start,
-                limit=limit
-            )
+            batch = self.zotero.items(itemType=item_type, start=start, limit=limit)
             if not batch:
                 break
-            items.extend(batch)
+            all_items.extend(batch)
             start += limit
-        return items
+        return all_items
